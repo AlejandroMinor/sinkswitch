@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-# Version 1.0
+# Version 1.1
 # written by Seyloria
 
 ### INFO ###
@@ -10,7 +10,12 @@
 # ~/myscripts/sinkswitch.sh -exclude 46,63,57
 
 # Catches sink ID's to exclude
+
+# Launch with "--sync" to force active streams to migrate immediately
+
 exclude_ids=()
+
+sync_active=false
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -18,13 +23,25 @@ while [[ $# -gt 0 ]]; do
       IFS=',' read -ra exclude_ids <<< "$2"
       shift 2
       ;;
+    --sync)
+      sync_active=true
+      shift
+      ;;
     *)
       shift
       ;;
   esac
 done
 
-# Returns 0 (true) if the given sink ID is in the exclude list
+sync_active_streams() {
+    local target_id="$1"
+    wpctl status | sed -n '/Streams:/,$p' | grep -E '[0-9]+\.' | awk -F'.' '{print $1}' | tr -d '[:space:]' | while read -r stream_id; do
+        if [[ -n "$stream_id" ]]; then
+            wpctl set-id "$stream_id" "$target_id" 2>/dev/null
+        fi
+    done
+}
+
 is_excluded() {
   local id="$1"
   for x in "${exclude_ids[@]}"; do
@@ -96,3 +113,8 @@ new_default="${selected%%|*}"
 
 # Set new default sink
 wpctl set-default "$new_default"
+
+if [ "$sync_active" = true ]; then
+    sync_active_streams "$new_default"
+fi
+
