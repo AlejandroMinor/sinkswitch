@@ -1,12 +1,13 @@
 #!/usr/bin/env bash
 
-# Version 1.3
+# Version 1.4
 # written by Seyloria
 
 exclude_ids=()
 
 sync_active=false
 notify_mode="none"
+wpctl_options=""
 
 while [[ $# -gt 0 ]]; do
   case "$1" in
@@ -21,6 +22,9 @@ OPTIONS:
   -exclude <ids>         Hide specific device IDs (comma-separated).
                          Run 'wpctl status' to find the IDs to hide.
                          Example: $(basename "$0") -exclude 45,60
+  
+  -nick                 Show sink nicknames instead of descriptions.
+                         Adds --nick flag to wpctl status.
                          
   -sync                 Migrate active audio streams (Spotify, Browser, etc.)
                          to the new device immediately.
@@ -64,6 +68,10 @@ EOF
       notify_mode="hyprland"
       shift
       ;;
+    -nick)
+      wpctl_options="--nick"
+      shift
+      ;;
     *)
       echo "Error: Unknown option '$1'"
       echo "Use '$(basename "$0") -help' to see available options"
@@ -74,7 +82,7 @@ done
 
 sync_active_streams() {
     local target_id="$1"
-    wpctl status | sed -n '/Streams:/,$p' | grep -E '[0-9]+\.' | awk -F'.' '{print $1}' | tr -d '[:space:]' | while read -r stream_id; do
+    wpctl status $wpctl_options | sed -n '/Streams:/,$p' | grep -E '[0-9]+\.' | awk -F'.' '{print $1}' | tr -d '[:space:]' | while read -r stream_id; do
         if [[ -n "$stream_id" ]]; then
             wpctl set-id "$stream_id" "$target_id" 2>/dev/null
         fi
@@ -119,7 +127,7 @@ while IFS= read -r line; do
             default_sink="$id"
         fi
     fi
-done < <(wpctl status |
+done < <(wpctl status $wpctl_options |
 sed -n '
   /^Audio$/,/^[A-Z]/ {
     /^[[:space:]]*├─ Sinks:/ {
